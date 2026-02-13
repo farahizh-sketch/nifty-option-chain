@@ -43,7 +43,7 @@ export default function Home() {
     }
 
     loadData();
-    const interval = setInterval(loadData, 5000);
+    const interval = setInterval(loadData, 2000);
     return () => clearInterval(interval);
   }, []);
 
