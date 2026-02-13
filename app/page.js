@@ -38,7 +38,7 @@ export default function Home() {
 
       // Create 5 up & 5 down
       const selectedStrikes = [];
-      for (let i = -5; i <= 5; i++) {
+      for (let i = -9; i <= 9; i++) {
         selectedStrikes.push(atm + i * 50);
       }
 
