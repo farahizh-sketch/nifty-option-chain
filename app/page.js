@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 
 export default function Home() {
+  const [spot, setSpot] = useState("--");
   const [rows, setRows] = useState([]);
-  const [spot, setSpot] = useState(0);
 
-  useEffect(() => {
-    async function loadData() {
+  async function loadData() {
+    try {
       const res = await fetch("/api/option-chain");
       const json = await res.json();
 
@@ -15,75 +15,80 @@ export default function Home() {
 
       setSpot(json.spot);
 
-      const grouped = {};
+      const strikes = json.strikes;
+      const data = json.data;
 
-      Object.keys(json.data).forEach((key) => {
-        const item = json.data[key];
+      const formatted = strikes.map((strike) => {
+        const ceKey = Object.keys(data).find(
+          (k) => k.includes(strike) && k.endsWith("CE")
+        );
 
-        const strikeMatch = key.match(/(\d{5})(CE|PE)$/);
-        if (!strikeMatch) return;
+        const peKey = Object.keys(data).find(
+          (k) => k.includes(strike) && k.endsWith("PE")
+        );
 
-        const strike = Number(strikeMatch[1]);
-        const type = strikeMatch[2];
-
-        if (!grouped[strike]) {
-          grouped[strike] = { CE: "-", PE: "-" };
-        }
-
-        grouped[strike][type] = item.last_price;
+        return {
+          strike,
+          ce: ceKey ? data[ceKey] : null,
+          pe: peKey ? data[peKey] : null,
+        };
       });
 
-      // Find ATM
-      const atm = Math.round(json.spot / 50) * 50;
-
-      // Create 5 up & 5 down
-      const selectedStrikes = [];
-      for (let i = -9; i <= 9; i++) {
-        selectedStrikes.push(atm + i * 50);
-      }
-
-      const finalRows = selectedStrikes.map((strike) => ({
-        strike,
-        CE: grouped[strike]?.CE || "-",
-        PE: grouped[strike]?.PE || "-",
-      }));
-
-      setRows(finalRows);
+      setRows(formatted);
+    } catch (err) {
+      console.log(err);
     }
+  }
 
+  useEffect(() => {
     loadData();
     const interval = setInterval(loadData, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  const atmStrike = Math.round(spot / 50) * 50;
-
   return (
-    <div style={{ padding: 20 }}>
-      <h1>NIFTY Option Chain</h1>
+    <div style={styles.container}>
+      <header style={styles.header}>
+        <h1>Nifty<span style={{ color: "#3b82f6" }}>Trade</span></h1>
+        <div>
+          Spot: <span style={styles.spot}>{spot}</span>
+        </div>
+      </header>
 
-      <h2>Spot Price: {spot}</h2>
-
-      <table border="1" cellPadding="8">
+      <table style={styles.table}>
         <thead>
           <tr>
-            <th>CE LTP</th>
-            <th>Strike</th>
-            <th>PE LTP</th>
+            <th colSpan="3" style={{ background: "#1e3a8a" }}>CALLS</th>
+            <th>STRIKE</th>
+            <th colSpan="3" style={{ background: "#7f1d1d" }}>PUTS</th>
+          </tr>
+          <tr>
+            <th>OI</th>
+            <th>Vol</th>
+            <th>LTP</th>
+            <th></th>
+            <th>LTP</th>
+            <th>Vol</th>
+            <th>OI</th>
           </tr>
         </thead>
+
         <tbody>
-          {rows.map((row, index) => (
-            <tr
-              key={index}
-              style={{
-                backgroundColor:
-                  row.strike === atmStrike ? "#ffe082" : "white",
-              }}
-            >
-              <td>{row.CE}</td>
-              <td>{row.strike}</td>
-              <td>{row.PE}</td>
+          {rows.map((row, i) => (
+            <tr key={i}>
+              <td>{row.ce?.oi ?? "-"}</td>
+              <td>{row.ce?.volume ?? "-"}</td>
+              <td style={styles.ltpCall}>
+                {row.ce?.last_price ?? "-"}
+              </td>
+
+              <td style={styles.strike}>{row.strike}</td>
+
+              <td style={styles.ltpPut}>
+                {row.pe?.last_price ?? "-"}
+              </td>
+              <td>{row.pe?.volume ?? "-"}</td>
+              <td>{row.pe?.oi ?? "-"}</td>
             </tr>
           ))}
         </tbody>
@@ -91,3 +96,41 @@ export default function Home() {
     </div>
   );
 }
+
+const styles = {
+  container: {
+    background: "#0f172a",
+    minHeight: "100vh",
+    color: "white",
+    padding: "20px",
+    fontFamily: "Inter, sans-serif",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+  },
+  spot: {
+    fontSize: "20px",
+    fontWeight: "bold",
+    color: "#22c55e",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+  },
+  strike: {
+    background: "#1e293b",
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  ltpCall: {
+    color: "#22c55e",
+    fontWeight: "bold",
+  },
+  ltpPut: {
+    color: "#ef4444",
+    fontWeight: "bold",
+  },
+};
