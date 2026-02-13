@@ -8,17 +8,41 @@ export async function GET() {
       return NextResponse.json({ error: "UPSTOX_TOKEN missing" });
     }
 
-    const expiryDate = "2026-02-17"; // change expiry if needed
+    const expiryDate = "2026-02-17"; // Change expiry when needed
 
-    // 1️⃣ Get all NIFTY option contracts
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    };
+
+    // 1️⃣ Fetch NIFTY Spot
+    const spotResponse = await fetch(
+      "https://api.upstox.com/v2/market-quote/quotes?instrument_key=NSE_INDEX|Nifty 50",
+      { headers }
+    );
+
+    const spotJson = await spotResponse.json();
+
+    const spotPrice =
+      spotJson.data?.["NSE_INDEX:Nifty 50"]?.last_price || 0;
+
+    if (!spotPrice) {
+      return NextResponse.json({ error: "Unable to fetch spot price" });
+    }
+
+    // 2️⃣ Calculate ATM
+    const atm = Math.round(spotPrice / 50) * 50;
+
+    // 3️⃣ Create required strikes (5 up & 5 down)
+    const requiredStrikes = [];
+    for (let i = -5; i <= 5; i++) {
+      requiredStrikes.push(atm + i * 50);
+    }
+
+    // 4️⃣ Fetch all contracts
     const contractResponse = await fetch(
       "https://api.upstox.com/v2/option/contract?instrument_key=NSE_INDEX|Nifty 50",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      }
+      { headers }
     );
 
     const contractData = await contractResponse.json();
@@ -27,54 +51,36 @@ export async function GET() {
       return NextResponse.json({ error: "No contract data received" });
     }
 
-    // 2️⃣ Filter contracts by expiry
-    const filteredContracts = contractData.data.filter(
-      (c) => c.expiry === expiryDate
+    // 5️⃣ Filter by expiry AND required strikes
+    const selectedContracts = contractData.data.filter(
+      (c) =>
+        c.expiry === expiryDate &&
+        requiredStrikes.includes(Number(c.strike_price))
     );
 
-    if (filteredContracts.length === 0) {
-      return NextResponse.json({ error: "No contracts for this expiry" });
+    if (selectedContracts.length === 0) {
+      return NextResponse.json({ error: "No matching contracts found" });
     }
 
-    // 3️⃣ Take limited contracts (to avoid URL too long error)
-    const instrumentKeys = filteredContracts
-      .slice(0, 40)
+    // 6️⃣ Create instrument keys
+    const instrumentKeys = selectedContracts
       .map((c) => c.instrument_key)
       .join(",");
 
-    // 4️⃣ Fetch option quotes
+    // 7️⃣ Fetch option quotes
     const quoteResponse = await fetch(
       `https://api.upstox.com/v2/market-quote/quotes?instrument_key=${instrumentKeys}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      }
+      { headers }
     );
 
     const quoteData = await quoteResponse.json();
 
-    // 5️⃣ Fetch NIFTY SPOT
-    const spotResponse = await fetch(
-      "https://api.upstox.com/v2/market-quote/quotes?instrument_key=NSE_INDEX|Nifty 50",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      }
-    );
-
-    const spotJson = await spotResponse.json();
-
-    const spotPrice =
-      spotJson.data?.["NSE_INDEX:Nifty 50"]?.last_price || 0;
-
-    // 6️⃣ Return everything
+    // 8️⃣ Return final response
     return NextResponse.json({
       status: "success",
       spot: spotPrice,
+      atm: atm,
+      strikes: requiredStrikes,
       data: quoteData.data,
     });
 
