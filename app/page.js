@@ -3,40 +3,46 @@
 import { useEffect, useState } from "react";
 
 export default function Home() {
+  const lotSize = 65;
+
   const [spot, setSpot] = useState("--");
   const [rows, setRows] = useState([]);
   const [user, setUser] = useState(null);
   const [wallet, setWallet] = useState(0);
   const [positions, setPositions] = useState([]);
 
-  // ---------------- LOAD DATA ----------------
+  // ---------------- LOAD MARKET ----------------
   async function loadMarket() {
-    const res = await fetch("/api/option-chain");
-    const json = await res.json();
+    try {
+      const res = await fetch("/api/option-chain");
+      const json = await res.json();
 
-    if (!json.data) return;
+      if (!json.data) return;
 
-    setSpot(json.spot);
+      setSpot(json.spot);
 
-    const strikes = json.strikes;
-    const data = json.data;
+      const strikes = json.strikes;
+      const data = json.data;
 
-    const formatted = strikes.map((strike) => {
-      const ceKey = Object.keys(data).find(
-        (k) => k.includes(strike) && k.endsWith("CE")
-      );
-      const peKey = Object.keys(data).find(
-        (k) => k.includes(strike) && k.endsWith("PE")
-      );
+      const formatted = strikes.map((strike) => {
+        const ceKey = Object.keys(data).find(
+          (k) => k.includes(strike) && k.endsWith("CE")
+        );
+        const peKey = Object.keys(data).find(
+          (k) => k.includes(strike) && k.endsWith("PE")
+        );
 
-      return {
-        strike,
-        ce: ceKey ? data[ceKey] : null,
-        pe: peKey ? data[peKey] : null,
-      };
-    });
+        return {
+          strike,
+          ce: ceKey ? data[ceKey] : null,
+          pe: peKey ? data[peKey] : null,
+        };
+      });
 
-    setRows(formatted);
+      setRows(formatted);
+    } catch (err) {
+      console.log(err);
+    }
   }
 
   // ---------------- LOGIN ----------------
@@ -45,8 +51,9 @@ export default function Home() {
     if (!name) return;
 
     const newUser = { name };
+
     localStorage.setItem("user", JSON.stringify(newUser));
-    localStorage.setItem("wallet", 100000);
+    localStorage.setItem("wallet", 1000000);
     localStorage.setItem("positions", JSON.stringify([]));
 
     setUser(newUser);
@@ -59,10 +66,18 @@ export default function Home() {
     setUser(null);
   }
 
-  // ---------------- BUY FUNCTION ----------------
+  // ---------------- BUY ----------------
   function buyOption(strike, type, price) {
-    const qty = 50; // lot size
+    const qtyInput = prompt("Enter lots (1 lot = 65 qty):");
+    if (!qtyInput) return;
 
+    const lots = Number(qtyInput);
+    if (isNaN(lots) || lots <= 0) {
+      alert("Invalid lots");
+      return;
+    }
+
+    const qty = lots * lotSize;
     const cost = qty * price;
 
     if (wallet < cost) {
@@ -71,6 +86,7 @@ export default function Home() {
     }
 
     const newWallet = wallet - cost;
+
     const newPosition = {
       strike,
       type,
@@ -87,7 +103,25 @@ export default function Home() {
     localStorage.setItem("positions", JSON.stringify(updatedPositions));
   }
 
-  // ---------------- LOAD LOCAL DATA ----------------
+  // ---------------- EXIT ----------------
+  function exitPosition(index, currentPrice) {
+    const position = positions[index];
+
+    const exitValue = position.qty * currentPrice;
+    const newWallet = wallet + exitValue;
+
+    const updatedPositions = positions.filter(
+      (_, i) => i !== index
+    );
+
+    setWallet(newWallet);
+    setPositions(updatedPositions);
+
+    localStorage.setItem("wallet", newWallet);
+    localStorage.setItem("positions", JSON.stringify(updatedPositions));
+  }
+
+  // ---------------- LOAD LOCAL STORAGE ----------------
   useEffect(() => {
     loadMarket();
     const interval = setInterval(loadMarket, 3000);
@@ -105,7 +139,21 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // ---------------- UI ----------------
+  // ---------------- TOTAL MTM ----------------
+  const totalMTM = positions.reduce((total, pos) => {
+    const row = rows.find((r) => r.strike === pos.strike);
+
+    const currentPrice =
+      pos.type === "CE"
+        ? row?.ce?.last_price
+        : row?.pe?.last_price;
+
+    if (!currentPrice) return total;
+
+    return total + (currentPrice - pos.buyPrice) * pos.qty;
+  }, 0);
+
+  // ---------------- LOGIN SCREEN ----------------
   if (!user) {
     return (
       <div style={styles.center}>
@@ -117,19 +165,27 @@ export default function Home() {
     );
   }
 
+  // ---------------- MAIN UI ----------------
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h2>Welcome {user.name}</h2>
         <div>
-          Spot: <b>{spot}</b>
-        </div>
-        <div>
-          Wallet: ₹ <b>{wallet.toFixed(2)}</b>
+          <h2>Welcome {user.name}</h2>
+          <div>Spot: <b>{spot}</b></div>
+          <div>
+            Wallet: ₹ <b>{wallet.toFixed(2)}</b>
+          </div>
+          <div>
+            Total MTM:{" "}
+            <b style={{ color: totalMTM >= 0 ? "lime" : "red" }}>
+              {totalMTM.toFixed(2)}
+            </b>
+          </div>
         </div>
         <button onClick={logout}>Logout</button>
       </header>
 
+      {/* OPTION CHAIN */}
       <table style={styles.table}>
         <thead>
           <tr>
@@ -138,7 +194,6 @@ export default function Home() {
             <th>PE LTP</th>
           </tr>
         </thead>
-
         <tbody>
           {rows.map((row, i) => (
             <tr key={i}>
@@ -184,6 +239,7 @@ export default function Home() {
         </tbody>
       </table>
 
+      {/* POSITIONS */}
       <h3>Your Positions</h3>
       <table style={styles.table}>
         <thead>
@@ -192,17 +248,57 @@ export default function Home() {
             <th>Type</th>
             <th>Qty</th>
             <th>Buy Price</th>
+            <th>Current Price</th>
+            <th>Net Profit</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
-          {positions.map((pos, i) => (
-            <tr key={i}>
-              <td>{pos.strike}</td>
-              <td>{pos.type}</td>
-              <td>{pos.qty}</td>
-              <td>{pos.buyPrice}</td>
-            </tr>
-          ))}
+          {positions.map((pos, i) => {
+            const row = rows.find(
+              (r) => r.strike === pos.strike
+            );
+
+            const currentPrice =
+              pos.type === "CE"
+                ? row?.ce?.last_price
+                : row?.pe?.last_price;
+
+            const profit =
+              currentPrice
+                ? (currentPrice - pos.buyPrice) * pos.qty
+                : 0;
+
+            return (
+              <tr key={i}>
+                <td>{pos.strike}</td>
+                <td>{pos.type}</td>
+                <td>{pos.qty}</td>
+                <td>{pos.buyPrice}</td>
+                <td>{currentPrice ?? "-"}</td>
+                <td
+                  style={{
+                    color: profit >= 0 ? "lime" : "red",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {profit.toFixed(2)}
+                </td>
+                <td>
+                  {currentPrice && (
+                    <button
+                      style={styles.exitBtn}
+                      onClick={() =>
+                        exitPosition(i, currentPrice)
+                      }
+                    >
+                      Exit
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -224,6 +320,7 @@ const styles = {
   table: {
     width: "100%",
     marginBottom: "20px",
+    borderCollapse: "collapse",
   },
   strike: {
     fontWeight: "bold",
@@ -232,6 +329,13 @@ const styles = {
   buyBtn: {
     marginLeft: "5px",
     background: "green",
+    color: "white",
+    border: "none",
+    padding: "4px 6px",
+    cursor: "pointer",
+  },
+  exitBtn: {
+    background: "red",
     color: "white",
     border: "none",
     padding: "5px",
