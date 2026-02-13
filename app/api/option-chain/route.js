@@ -35,7 +35,7 @@ export async function GET() {
 
     // 3️⃣ Create required strikes (5 up & 5 down)
     const requiredStrikes = [];
-    for (let i = -5; i <= 5; i++) {
+    for (let i = -9; i <= 9; i++) {
       requiredStrikes.push(atm + i * 50);
     }
 
