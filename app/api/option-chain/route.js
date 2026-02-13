@@ -17,10 +17,13 @@ export async function GET() {
     const contractData = await contractResponse.json();
 
     // 2️⃣ Filter for desired expiry
-    const filteredContracts = contractData.data.filter((c: any) => c.expiry === expiryDate);
+    const filteredContracts = contractData.data.filter(c => c.expiry === expiryDate);
 
-    // 3️⃣ Take first 10 contracts (avoid URL too long)
-    const instrumentKeys = filteredContracts.slice(0, 10).map((c: any) => c.instrument_key).join(",");
+    // 3️⃣ Take first 10 contracts
+    const instrumentKeys = filteredContracts
+      .slice(0, 10)
+      .map(c => c.instrument_key)
+      .join(",");
 
     // 4️⃣ Fetch live quotes
     const quoteResponse = await fetch(
@@ -31,7 +34,7 @@ export async function GET() {
 
     return NextResponse.json(quoteData);
 
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json({ error: error.message });
   }
 }
