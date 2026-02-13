@@ -1,26 +1,59 @@
-"use client"; // needed for client-side JS like fetch
+"use client";
 
 import { useEffect, useState } from "react";
 
 export default function Home() {
-  const [data, setData] = useState({});
+  const [rows, setRows] = useState([]);
 
   useEffect(() => {
     async function loadData() {
       const res = await fetch("/api/option-chain");
       const json = await res.json();
-      setData(json.data);
+
+      if (!json.data) return;
+
+      const grouped = {};
+
+      Object.keys(json.data).forEach((key) => {
+        const item = json.data[key];
+
+        // Extract strike
+        const strikeMatch = key.match(/\d{5,}/);
+        if (!strikeMatch) return;
+        const strike = strikeMatch[0];
+
+        if (!grouped[strike]) {
+          grouped[strike] = { CE: "-", PE: "-" };
+        }
+
+        if (key.includes("CE")) {
+          grouped[strike].CE = item.last_price;
+        } else if (key.includes("PE")) {
+          grouped[strike].PE = item.last_price;
+        }
+      });
+
+      const formattedRows = Object.keys(grouped)
+        .sort((a, b) => Number(a) - Number(b))
+        .map((strike) => ({
+          strike,
+          CE: grouped[strike].CE,
+          PE: grouped[strike].PE,
+        }));
+
+      setRows(formattedRows);
     }
 
     loadData();
-    const interval = setInterval(loadData, 5000); // refresh every 5s
+    const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div>
+    <div style={{ padding: 20 }}>
       <h2>NIFTY Option Chain</h2>
-      <table border="1">
+
+      <table border="1" cellPadding="6">
         <thead>
           <tr>
             <th>CE LTP</th>
@@ -29,20 +62,13 @@ export default function Home() {
           </tr>
         </thead>
         <tbody>
-          {data &&
-            Object.keys(data).sort().map((symbol) => {
-              const item = data[symbol];
-              const ce = item["CE"]?.last_price || "-";
-              const pe = item["PE"]?.last_price || "-";
-              const strike = symbol.match(/\d+/)[0];
-              return (
-                <tr key={symbol}>
-                  <td>{ce}</td>
-                  <td>{strike}</td>
-                  <td>{pe}</td>
-                </tr>
-              );
-            })}
+          {rows.map((row, index) => (
+            <tr key={index}>
+              <td>{row.CE}</td>
+              <td>{row.strike}</td>
+              <td>{row.PE}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
