@@ -5,90 +5,202 @@ import { useEffect, useState } from "react";
 export default function Home() {
   const [spot, setSpot] = useState("--");
   const [rows, setRows] = useState([]);
+  const [user, setUser] = useState(null);
+  const [wallet, setWallet] = useState(0);
+  const [positions, setPositions] = useState([]);
 
-  async function loadData() {
-    try {
-      const res = await fetch("/api/option-chain");
-      const json = await res.json();
+  // ---------------- LOAD DATA ----------------
+  async function loadMarket() {
+    const res = await fetch("/api/option-chain");
+    const json = await res.json();
 
-      if (!json.data) return;
+    if (!json.data) return;
 
-      setSpot(json.spot);
+    setSpot(json.spot);
 
-      const strikes = json.strikes;
-      const data = json.data;
+    const strikes = json.strikes;
+    const data = json.data;
 
-      const formatted = strikes.map((strike) => {
-        const ceKey = Object.keys(data).find(
-          (k) => k.includes(strike) && k.endsWith("CE")
-        );
+    const formatted = strikes.map((strike) => {
+      const ceKey = Object.keys(data).find(
+        (k) => k.includes(strike) && k.endsWith("CE")
+      );
+      const peKey = Object.keys(data).find(
+        (k) => k.includes(strike) && k.endsWith("PE")
+      );
 
-        const peKey = Object.keys(data).find(
-          (k) => k.includes(strike) && k.endsWith("PE")
-        );
+      return {
+        strike,
+        ce: ceKey ? data[ceKey] : null,
+        pe: peKey ? data[peKey] : null,
+      };
+    });
 
-        return {
-          strike,
-          ce: ceKey ? data[ceKey] : null,
-          pe: peKey ? data[peKey] : null,
-        };
-      });
-
-      setRows(formatted);
-    } catch (err) {
-      console.log(err);
-    }
+    setRows(formatted);
   }
 
+  // ---------------- LOGIN ----------------
+  function handleLogin() {
+    const name = prompt("Enter your name");
+    if (!name) return;
+
+    const newUser = { name };
+    localStorage.setItem("user", JSON.stringify(newUser));
+    localStorage.setItem("wallet", 100000);
+    localStorage.setItem("positions", JSON.stringify([]));
+
+    setUser(newUser);
+    setWallet(100000);
+    setPositions([]);
+  }
+
+  function logout() {
+    localStorage.clear();
+    setUser(null);
+  }
+
+  // ---------------- BUY FUNCTION ----------------
+  function buyOption(strike, type, price) {
+    const qty = 50; // lot size
+
+    const cost = qty * price;
+
+    if (wallet < cost) {
+      alert("Insufficient Balance");
+      return;
+    }
+
+    const newWallet = wallet - cost;
+    const newPosition = {
+      strike,
+      type,
+      qty,
+      buyPrice: price,
+    };
+
+    const updatedPositions = [...positions, newPosition];
+
+    setWallet(newWallet);
+    setPositions(updatedPositions);
+
+    localStorage.setItem("wallet", newWallet);
+    localStorage.setItem("positions", JSON.stringify(updatedPositions));
+  }
+
+  // ---------------- LOAD LOCAL DATA ----------------
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 3000);
+    loadMarket();
+    const interval = setInterval(loadMarket, 3000);
+
+    const storedUser = localStorage.getItem("user");
+    const storedWallet = localStorage.getItem("wallet");
+    const storedPositions = localStorage.getItem("positions");
+
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+      setWallet(Number(storedWallet));
+      setPositions(JSON.parse(storedPositions));
+    }
+
     return () => clearInterval(interval);
   }, []);
+
+  // ---------------- UI ----------------
+  if (!user) {
+    return (
+      <div style={styles.center}>
+        <h2>Paper Trading Login</h2>
+        <button style={styles.button} onClick={handleLogin}>
+          Start Trading
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h1>Nifty<span style={{ color: "#3b82f6" }}>Trade</span></h1>
+        <h2>Welcome {user.name}</h2>
         <div>
-          Spot: <span style={styles.spot}>{spot}</span>
+          Spot: <b>{spot}</b>
         </div>
+        <div>
+          Wallet: ₹ <b>{wallet.toFixed(2)}</b>
+        </div>
+        <button onClick={logout}>Logout</button>
       </header>
 
       <table style={styles.table}>
         <thead>
           <tr>
-            <th colSpan="3" style={{ background: "#1e3a8a" }}>CALLS</th>
-            <th>STRIKE</th>
-            <th colSpan="3" style={{ background: "#7f1d1d" }}>PUTS</th>
-          </tr>
-          <tr>
-            <th>OI</th>
-            <th>Vol</th>
-            <th>LTP</th>
-            <th></th>
-            <th>LTP</th>
-            <th>Vol</th>
-            <th>OI</th>
+            <th>CE LTP</th>
+            <th>Strike</th>
+            <th>PE LTP</th>
           </tr>
         </thead>
 
         <tbody>
           {rows.map((row, i) => (
             <tr key={i}>
-              <td>{row.ce?.oi ?? "-"}</td>
-              <td>{row.ce?.volume ?? "-"}</td>
-              <td style={styles.ltpCall}>
+              <td>
                 {row.ce?.last_price ?? "-"}
+                {row.ce && (
+                  <button
+                    style={styles.buyBtn}
+                    onClick={() =>
+                      buyOption(
+                        row.strike,
+                        "CE",
+                        row.ce.last_price
+                      )
+                    }
+                  >
+                    Buy
+                  </button>
+                )}
               </td>
 
               <td style={styles.strike}>{row.strike}</td>
 
-              <td style={styles.ltpPut}>
+              <td>
                 {row.pe?.last_price ?? "-"}
+                {row.pe && (
+                  <button
+                    style={styles.buyBtn}
+                    onClick={() =>
+                      buyOption(
+                        row.strike,
+                        "PE",
+                        row.pe.last_price
+                      )
+                    }
+                  >
+                    Buy
+                  </button>
+                )}
               </td>
-              <td>{row.pe?.volume ?? "-"}</td>
-              <td>{row.pe?.oi ?? "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h3>Your Positions</h3>
+      <table style={styles.table}>
+        <thead>
+          <tr>
+            <th>Strike</th>
+            <th>Type</th>
+            <th>Qty</th>
+            <th>Buy Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {positions.map((pos, i) => (
+            <tr key={i}>
+              <td>{pos.strike}</td>
+              <td>{pos.type}</td>
+              <td>{pos.qty}</td>
+              <td>{pos.buyPrice}</td>
             </tr>
           ))}
         </tbody>
@@ -99,38 +211,41 @@ export default function Home() {
 
 const styles = {
   container: {
-    background: "#0f172a",
+    background: "#111",
     minHeight: "100vh",
     color: "white",
     padding: "20px",
-    fontFamily: "Inter, sans-serif",
   },
   header: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
     marginBottom: "20px",
-  },
-  spot: {
-    fontSize: "20px",
-    fontWeight: "bold",
-    color: "#22c55e",
   },
   table: {
     width: "100%",
-    borderCollapse: "collapse",
+    marginBottom: "20px",
   },
   strike: {
-    background: "#1e293b",
     fontWeight: "bold",
     textAlign: "center",
   },
-  ltpCall: {
-    color: "#22c55e",
-    fontWeight: "bold",
+  buyBtn: {
+    marginLeft: "5px",
+    background: "green",
+    color: "white",
+    border: "none",
+    padding: "5px",
+    cursor: "pointer",
   },
-  ltpPut: {
-    color: "#ef4444",
-    fontWeight: "bold",
+  center: {
+    height: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "column",
+  },
+  button: {
+    padding: "10px 20px",
+    fontSize: "16px",
   },
 };
