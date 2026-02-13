@@ -17,20 +17,18 @@ export default function Home() {
       Object.keys(json.data).forEach((key) => {
         const item = json.data[key];
 
-        // Extract strike
-        const strikeMatch = key.match(/\d{5,}/);
+        // Extract strike properly (last 5 digits before CE/PE)
+        const strikeMatch = key.match(/(\d{5})(CE|PE)$/);
         if (!strikeMatch) return;
-        const strike = strikeMatch[0];
+
+        const strike = strikeMatch[1];
+        const type = strikeMatch[2];
 
         if (!grouped[strike]) {
           grouped[strike] = { CE: "-", PE: "-" };
         }
 
-        if (key.includes("CE")) {
-          grouped[strike].CE = item.last_price;
-        } else if (key.includes("PE")) {
-          grouped[strike].PE = item.last_price;
-        }
+        grouped[strike][type] = item.last_price;
       });
 
       const formattedRows = Object.keys(grouped)
