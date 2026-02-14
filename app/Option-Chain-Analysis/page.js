@@ -532,7 +532,101 @@ export default function OptionChainAnalysis() {
             padding: 8px 5px;
           }
         }
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.85);
+          backdrop-filter: blur(10px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+        .modal-content {
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          padding: 40px;
+          border-radius: 20px;
+          text-align: center;
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+        .user-input {
+          width: 100%;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 10px;
+          padding: 15px;
+          color: #fff;
+          font-size: 1.2rem;
+          margin: 20px 0;
+          text-align: center;
+        }
+        .start-btn {
+          width: 100%;
+          margin-top: 10px;
+        }
+        .wallet-section {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 20px;
+          margin-bottom: 30px;
+        }
+        .wallet-card {
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(10px);
+          padding: 20px;
+          border-radius: 15px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          text-align: center;
+        }
+        .wallet-label {
+          color: #a0aec0;
+          font-size: 0.9rem;
+          margin-bottom: 10px;
+        }
+        .wallet-value {
+          font-size: 1.5rem;
+          font-weight: 700;
+        }
+        .wallet-value.profit { color: #48bb78; }
+        .wallet-value.loss { color: #f56565; }
       `}</style>
+      {/* User Setup Modal */}
+      {showUserSetup && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Welcome to Option Trading</h2>
+            <p>Create your User ID to start trading</p>
+            <input
+              type="text"
+              placeholder="Enter User ID"
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              className="user-input"
+            />
+            <p style={{ fontSize: '0.9rem', color: '#a0aec0', marginTop: 10 }}>
+              Starting Balance: ₹10,00,000
+            </p>
+            <button
+              className="start-btn"
+              onClick={() => {
+                if (userId.trim()) {
+                  setShowUserSetup(false);
+                } else {
+                  alert('Please enter a User ID');
+                }
+              }}
+            >
+              Start Trading
+            </button>
+          </div>
+        </div>
+      )}
       <div className="header">
         <div className="header-top">
           <h1 className="title">NIFTY Option Chain Analysis</h1>
@@ -541,6 +635,29 @@ export default function OptionChainAnalysis() {
             Last Updated: {lastUpdate?.toLocaleTimeString()}
           </div>
         </div>
+        {/* Wallet & Profit Display */}
+        {!showUserSetup && (
+          <div className="wallet-section">
+            <div className="wallet-card">
+              <div className="wallet-label">User ID</div>
+              <div className="wallet-value">{userId}</div>
+            </div>
+            <div className="wallet-card">
+              <div className="wallet-label">Wallet Balance</div>
+              <div className="wallet-value">₹{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div className="wallet-card">
+              <div className="wallet-label">Net Profit (Open Positions)</div>
+              <div className={`wallet-value ${calculateTotalPnL() >= 0 ? 'profit' : 'loss'}`}>
+                ₹{calculateTotalPnL().toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div className="wallet-card">
+              <div className="wallet-label">Total Value</div>
+              <div className="wallet-value">₹{(walletBalance + calculateTotalPnL()).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+          </div>
+        )}
         <div className="metrics-grid">
           <div className="metric-card">
             <div className="metric-label">Spot Price</div>
