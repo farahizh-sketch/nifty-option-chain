@@ -27,10 +27,34 @@ export default function OptionChainAnalysis() {
     }
   };
   useEffect(() => {
+    // Load persisted state
+    const savedUserId = localStorage.getItem('trader_userId');
+    const savedBalance = localStorage.getItem('trader_walletBalance');
+    const savedPositions = localStorage.getItem('trader_positions');
+    if (savedUserId) {
+      setUserId(savedUserId);
+      setShowUserSetup(false);
+    }
+    if (savedBalance) {
+      setWalletBalance(parseFloat(savedBalance));
+    }
+    if (savedPositions) {
+      setPositions(JSON.parse(savedPositions));
+    }
     fetchData();
     const interval = setInterval(fetchData, 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
   }, []);
+  // Persist state changes
+  useEffect(() => {
+    if (userId) localStorage.setItem('trader_userId', userId);
+  }, [userId]);
+  useEffect(() => {
+    localStorage.setItem('trader_walletBalance', walletBalance.toString());
+  }, [walletBalance]);
+  useEffect(() => {
+    localStorage.setItem('trader_positions', JSON.stringify(positions));
+  }, [positions]);
   // Calculate PCR (Put-Call Ratio)
   const calculatePCR = () => {
     if (!data?.data) return { oiPCR: 0, volumePCR: 0 };
