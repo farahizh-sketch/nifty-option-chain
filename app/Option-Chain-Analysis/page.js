@@ -8,6 +8,9 @@ export default function OptionChainAnalysis() {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [buyQuantity, setBuyQuantity] = useState(65);
   const [positions, setPositions] = useState([]);
+  const [userId, setUserId] = useState('');
+  const [walletBalance, setWalletBalance] = useState(1000000);
+  const [showUserSetup, setShowUserSetup] = useState(true);
   // Fetch data from API
   const fetchData = async () => {
     try {
@@ -110,6 +113,12 @@ export default function OptionChainAnalysis() {
   };
   // Handle buy at market
   const handleBuyAtMarket = (symbol, price, type) => {
+    const totalCost = price * buyQuantity;
+    // Check if sufficient balance
+    if (totalCost > walletBalance) {
+      alert(`Insufficient Balance!\n\nRequired: ₹${totalCost.toFixed(2)}\nAvailable: ₹${walletBalance.toFixed(2)}`);
+      return;
+    }
     const newPosition = {
       id: Date.now(),
       symbol,
@@ -118,8 +127,9 @@ export default function OptionChainAnalysis() {
       quantity: buyQuantity,
       timestamp: new Date().toLocaleString()
     };
-    // Add to positions
+    // Add to positions and deduct from wallet
     setPositions(prev => [...prev, newPosition]);
+    setWalletBalance(prev => prev - totalCost);
     // Log order (you can replace this with actual API call)
     console.log('Buy Order:', newPosition);
     alert(`Buy Order Placed!\n\nSymbol: ${symbol}\nType: ${type}\nPrice: ₹${price}\nQuantity: ${buyQuantity}\nTotal: ₹${(price * buyQuantity).toFixed(2)}`);
@@ -128,9 +138,13 @@ export default function OptionChainAnalysis() {
   const handleExitPosition = (positionId) => {
     const position = positions.find(p => p.id === positionId);
     if (position && window.confirm(`Exit position for ${position.symbol}?`)) {
+      const currentPrice = getCurrentPrice(position.symbol);
+      const proceeds = currentPrice * position.quantity;
+      const pnl = (currentPrice - position.buyPrice) * position.quantity;
       setPositions(prev => prev.filter(p => p.id !== positionId));
+      setWalletBalance(prev => prev + proceeds);
       console.log('Position Exited:', position);
-      alert(`Position Exited!\n\nSymbol: ${position.symbol}`);
+      alert(`Position Exited!\n\nSymbol: ${position.symbol}\nExit Price: ₹${currentPrice.toFixed(2)}\nProceeds: ₹${proceeds.toFixed(2)}\nP&L: ₹${pnl.toFixed(2)}\n\nNew Balance: ₹${(walletBalance + proceeds).toFixed(2)}`);
     }
   };
   // Get current price for a position
