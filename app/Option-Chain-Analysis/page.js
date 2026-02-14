@@ -84,6 +84,8 @@ export default function OptionChainAnalysis() {
         strike,
         call: ceSymbol ? data.data[ceSymbol] : null,
         put: peSymbol ? data.data[peSymbol] : null,
+        callSymbol: ceSymbol,
+        putSymbol: peSymbol,
         isATM: strike === data.atm
       };
     });
@@ -133,8 +135,19 @@ export default function OptionChainAnalysis() {
   };
   // Get current price for a position
   const getCurrentPrice = (symbol) => {
-    if (!data?.data) return 0;
-    return data.data[symbol]?.last_price || 0;
+    if (!data?.data || !symbol) return 0;
+    // Find the option data by symbol
+    const optionData = data.data[symbol];
+    if (optionData) {
+      return optionData.last_price || 0;
+    }
+    // If direct lookup fails, search through all symbols
+    for (const [key, value] of Object.entries(data.data)) {
+      if (key === symbol || value.symbol === symbol) {
+        return value.last_price || 0;
+      }
+    }
+    return 0;
   };
   // Calculate P&L for a position
   const calculatePnL = (position) => {
@@ -577,7 +590,7 @@ export default function OptionChainAnalysis() {
               </tr>
             </thead>
             <tbody>
-              {getSortedData().map(({ strike, call, put, isATM }) => (
+              {getSortedData().map(({ strike, call, put, callSymbol, putSymbol, isATM }) => (
                 <tr key={strike}>
                   <td className={getMoneyness(strike, 'CE')}>{formatNumber(call?.oi)}</td>
                   <td className={`${getMoneyness(strike, 'CE')} ${call?.net_change >= 0 ? 'positive' : 'negative'}`}>
@@ -593,7 +606,7 @@ export default function OptionChainAnalysis() {
                   <td className={getMoneyness(strike, 'CE')}>
                     <button
                       className="buy-btn"
-                      onClick={() => handleBuyAtMarket(call?.symbol, call?.last_price, 'CE')}
+                      onClick={() => handleBuyAtMarket(callSymbol, call?.last_price, 'CE')}
                       disabled={!call?.last_price}
                     >
                       Buy
@@ -603,7 +616,7 @@ export default function OptionChainAnalysis() {
                   <td className={getMoneyness(strike, 'PE')}>
                     <button
                       className="buy-btn"
-                      onClick={() => handleBuyAtMarket(put?.symbol, put?.last_price, 'PE')}
+                      onClick={() => handleBuyAtMarket(putSymbol, put?.last_price, 'PE')}
                       disabled={!put?.last_price}
                     >
                       Buy
