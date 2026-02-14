@@ -108,15 +108,18 @@ export default function OptionChainAnalysis() {
   };
   // Handle buy at market
   const handleBuyAtMarket = (symbol, price, type) => {
-    const orderDetails = {
+    const newPosition = {
+      id: Date.now(),
       symbol,
       type, // 'CE' or 'PE'
-      price,
+      buyPrice: price,
       quantity: buyQuantity,
       timestamp: new Date().toLocaleString()
     };
+    // Add to positions
+    setPositions(prev => [...prev, newPosition]);
     // Log order (you can replace this with actual API call)
-    console.log('Buy Order:', orderDetails);
+    console.log('Buy Order:', newPosition);
     alert(`Buy Order Placed!\n\nSymbol: ${symbol}\nType: ${type}\nPrice: ₹${price}\nQuantity: ${buyQuantity}\nTotal: ₹${(price * buyQuantity).toFixed(2)}`);
   };
   // Handle exit position
@@ -621,29 +624,6 @@ export default function OptionChainAnalysis() {
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
-      <div className="analysis-section">
-        <h2 className="section-title">Open Interest Distribution</h2>
-        <div className="oi-chart">
-          {getSortedData().slice(0, 10).map(({ strike, call, put }) => {
-            const maxOI = Math.max(call?.oi || 0, put?.oi || 0);
-            const callWidth = maxOI > 0 ? ((call?.oi || 0) / maxOI) * 100 : 0;
-            const putWidth = maxOI > 0 ? ((put?.oi || 0) / maxOI) * 100 : 0;
-            return (
-              <div key={strike} className="oi-bar">
-                <div style={{ fontWeight: 600, marginBottom: 5 }}>{strike}</div>
-                <div style={{ fontSize: '0.75rem', color: '#48bb78' }}>
-                  CE: {formatNumber(call?.oi)}
-                </div>
-                <div className="oi-bar-fill call" style={{ width: `${callWidth}%` }}></div>
-                <div style={{ fontSize: '0.75rem', color: '#f56565', marginTop: 10 }}>
-                  PE: {formatNumber(put?.oi)}
-                </div>
-                <div className="oi-bar-fill put" style={{ width: `${putWidth}%` }}></div>
-              </div>
-            );
-          })}
         </div>
       </div>
       {/* Net Positions Section */}
