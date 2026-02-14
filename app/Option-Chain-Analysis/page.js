@@ -7,6 +7,7 @@ export default function OptionChainAnalysis() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [buyQuantity, setBuyQuantity] = useState(65);
+  const [positions, setPositions] = useState([]);
   // Fetch data from API
   const fetchData = async () => {
     try {
@@ -117,6 +118,30 @@ export default function OptionChainAnalysis() {
     // Log order (you can replace this with actual API call)
     console.log('Buy Order:', orderDetails);
     alert(`Buy Order Placed!\n\nSymbol: ${symbol}\nType: ${type}\nPrice: ₹${price}\nQuantity: ${buyQuantity}\nTotal: ₹${(price * buyQuantity).toFixed(2)}`);
+  };
+  // Handle exit position
+  const handleExitPosition = (positionId) => {
+    const position = positions.find(p => p.id === positionId);
+    if (position && window.confirm(`Exit position for ${position.symbol}?`)) {
+      setPositions(prev => prev.filter(p => p.id !== positionId));
+      console.log('Position Exited:', position);
+      alert(`Position Exited!\n\nSymbol: ${position.symbol}`);
+    }
+  };
+  // Get current price for a position
+  const getCurrentPrice = (symbol) => {
+    if (!data?.data) return 0;
+    return data.data[symbol]?.last_price || 0;
+  };
+  // Calculate P&L for a position
+  const calculatePnL = (position) => {
+    const currentPrice = getCurrentPrice(position.symbol);
+    const pnl = (currentPrice - position.buyPrice) * position.quantity;
+    return pnl;
+  };
+  // Calculate total P&L
+  const calculateTotalPnL = () => {
+    return positions.reduce((total, position) => total + calculatePnL(position), 0);
   };
   // Handle quantity change
   const handleQuantityChange = (e) => {
@@ -399,6 +424,22 @@ export default function OptionChainAnalysis() {
           cursor: not-allowed;
           opacity: 0.5;
         }
+        .exit-btn {
+          background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+          padding: 6px 16px;
+          border-radius: 6px;
+          font-size: 0.85rem;
+          margin: 0;
+          transition: all 0.3s ease;
+          color: #fff;
+          border: none;
+          cursor: pointer;
+          font-weight: 600;
+        }
+        .exit-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(245, 101, 101, 0.4);
+        }
         .quantity-input {
           width: 100%;
           background: rgba(255, 255, 255, 0.1);
@@ -490,10 +531,6 @@ export default function OptionChainAnalysis() {
           <div className="metric-card">
             <div className="metric-label">Market Sentiment</div>
             <div className={`metric-value ${sentiment.toLowerCase()}`}>{sentiment}</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-label">Max Pain</div>
-            <div className="metric-value">{formatNumber(maxPain.strike)}</div>
           </div>
           <div className="metric-card">
             <div className="metric-label">Buy Quantity</div>
@@ -608,6 +645,80 @@ export default function OptionChainAnalysis() {
             );
           })}
         </div>
+      </div>
+      {/* Net Positions Section */}
+      <div className="analysis-section">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h2 className="section-title" style={{ margin: 0 }}>Net Positions</h2>
+          <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>
+            Total P&L: <span className={calculateTotalPnL() >= 0 ? 'positive' : 'negative'}>
+              ₹{calculateTotalPnL().toFixed(2)}
+            </span>
+          </div>
+        </div>
+        {positions.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#a0aec0' }}>
+            <p style={{ fontSize: '1.1rem' }}>No open positions</p>
+            <p style={{ fontSize: '0.9rem' }}>Click "Buy" on any option to start trading</p>
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Type</th>
+                  <th>Quantity</th>
+                  <th>Buy Price</th>
+                  <th>Current Price</th>
+                  <th>P&L</th>
+                  <th>P&L %</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {positions.map(position => {
+                  const currentPrice = getCurrentPrice(position.symbol);
+                  const pnl = calculatePnL(position);
+                  const pnlPercent = position.buyPrice > 0 ? ((currentPrice - position.buyPrice) / position.buyPrice * 100) : 0;
+                  return (
+                    <tr key={position.id}>
+                      <td style={{ fontWeight: 600 }}>{position.symbol}</td>
+                      <td>
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '6px',
+                          background: position.type === 'CE' ? 'rgba(72, 187, 120, 0.2)' : 'rgba(245, 101, 101, 0.2)',
+                          color: position.type === 'CE' ? '#48bb78' : '#f56565',
+                          fontWeight: 600
+                        }}>
+                          {position.type}
+                        </span>
+                      </td>
+                      <td>{position.quantity}</td>
+                      <td>₹{position.buyPrice.toFixed(2)}</td>
+                      <td>₹{currentPrice.toFixed(2)}</td>
+                      <td className={pnl >= 0 ? 'positive' : 'negative'} style={{ fontWeight: 700 }}>
+                        ₹{pnl.toFixed(2)}
+                      </td>
+                      <td className={pnlPercent >= 0 ? 'positive' : 'negative'} style={{ fontWeight: 700 }}>
+                        {pnlPercent.toFixed(2)}%
+                      </td>
+                      <td>
+                        <button
+                          className="exit-btn"
+                          onClick={() => handleExitPosition(position.id)}
+                        >
+                          Exit
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
