@@ -6,6 +6,7 @@ export default function OptionChainAnalysis() {
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [buyQuantity, setBuyQuantity] = useState(65);
   // Fetch data from API
   const fetchData = async () => {
     try {
@@ -29,7 +30,6 @@ export default function OptionChainAnalysis() {
   // Calculate PCR (Put-Call Ratio)
   const calculatePCR = () => {
     if (!data?.data) return { oiPCR: 0, volumePCR: 0 };
-    
     let totalCallOI = 0, totalPutOI = 0;
     let totalCallVolume = 0, totalPutVolume = 0;
     Object.entries(data.data).forEach(([symbol, optionData]) => {
@@ -54,7 +54,6 @@ export default function OptionChainAnalysis() {
       let totalPain = 0;
       Object.entries(data.data).forEach(([symbol, optionData]) => {
         const strikeFromSymbol = parseInt(symbol.match(/\d{5}(?=CE|PE)/)?.[0]);
-        
         if (symbol.includes('CE')) {
           // Call writers lose money when price > strike
           if (data.spot > strikeFromSymbol) {
@@ -69,9 +68,9 @@ export default function OptionChainAnalysis() {
       });
       painByStrike[strike] = totalPain;
     });
-    const maxPainStrike = Object.entries(painByStrike).reduce((min, [strike, pain]) => 
+    const maxPainStrike = Object.entries(painByStrike).reduce((min, [strike, pain]) =>
       pain < min.pain ? { strike: parseInt(strike), pain } : min
-    , { strike: 0, pain: Infinity });
+      , { strike: 0, pain: Infinity });
     return maxPainStrike;
   };
   // Get option data by strike
@@ -106,6 +105,26 @@ export default function OptionChainAnalysis() {
       return 'otm';
     }
   };
+  // Handle buy at market
+  const handleBuyAtMarket = (symbol, price, type) => {
+    const orderDetails = {
+      symbol,
+      type, // 'CE' or 'PE'
+      price,
+      quantity: buyQuantity,
+      timestamp: new Date().toLocaleString()
+    };
+    // Log order (you can replace this with actual API call)
+    console.log('Buy Order:', orderDetails);
+    alert(`Buy Order Placed!\n\nSymbol: ${symbol}\nType: ${type}\nPrice: ₹${price}\nQuantity: ${buyQuantity}\nTotal: ₹${(price * buyQuantity).toFixed(2)}`);
+  };
+  // Handle quantity change
+  const handleQuantityChange = (e) => {
+    const value = parseInt(e.target.value) || 65;
+    // Round to nearest multiple of 65
+    const rounded = Math.max(65, Math.round(value / 65) * 65);
+    setBuyQuantity(rounded);
+  };
   // Sort table
   const handleSort = (key, type) => {
     let direction = 'asc';
@@ -121,10 +140,8 @@ export default function OptionChainAnalysis() {
     return [...optionData].sort((a, b) => {
       const aVal = type === 'call' ? a.call?.[key] : a.put?.[key];
       const bVal = type === 'call' ? b.call?.[key] : b.put?.[key];
-      
       if (aVal === null || aVal === undefined) return 1;
       if (bVal === null || bVal === undefined) return -1;
-      
       return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
     });
   };
@@ -365,6 +382,44 @@ export default function OptionChainAnalysis() {
           transform: translateY(-2px);
           box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
         }
+        .buy-btn {
+          background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+          padding: 6px 16px;
+          border-radius: 6px;
+          font-size: 0.85rem;
+          margin: 0;
+          transition: all 0.3s ease;
+        }
+        .buy-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+        }
+        .buy-btn:disabled {
+          background: rgba(255, 255, 255, 0.1);
+          cursor: not-allowed;
+          opacity: 0.5;
+        }
+        .quantity-input {
+          width: 100%;
+          background: rgba(255, 255, 255, 0.1);
+          border: 2px solid rgba(255, 255, 255, 0.2);
+          border-radius: 10px;
+          padding: 12px;
+          color: #fff;
+          font-size: 1.5rem;
+          font-weight: 700;
+          text-align: center;
+          transition: all 0.3s ease;
+        }
+        .quantity-input:focus {
+          outline: none;
+          border-color: #667eea;
+          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+        .quantity-input::-webkit-inner-spin-button,
+        .quantity-input::-webkit-outer-spin-button {
+          opacity: 1;
+        }
         .oi-chart {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -440,6 +495,20 @@ export default function OptionChainAnalysis() {
             <div className="metric-label">Max Pain</div>
             <div className="metric-value">{formatNumber(maxPain.strike)}</div>
           </div>
+          <div className="metric-card">
+            <div className="metric-label">Buy Quantity</div>
+            <input
+              type="number"
+              className="quantity-input"
+              value={buyQuantity}
+              onChange={handleQuantityChange}
+              step="65"
+              min="65"
+            />
+            <div style={{ fontSize: '0.75rem', color: '#a0aec0', marginTop: '5px' }}>
+              (Multiples of 65)
+            </div>
+          </div>
         </div>
       </div>
       <div className="analysis-section">
@@ -448,23 +517,22 @@ export default function OptionChainAnalysis() {
           <table>
             <thead>
               <tr>
-                <th colSpan="6" style={{background: 'rgba(72, 187, 120, 0.2)'}}>CALLS</th>
+                <th colSpan="6" style={{ background: 'rgba(72, 187, 120, 0.2)' }}>CALLS</th>
                 <th rowSpan="2" className="strike-cell">STRIKE</th>
-                <th colSpan="6" style={{background: 'rgba(245, 101, 101, 0.2)'}}>PUTS</th>
+                <th colSpan="6" style={{ background: 'rgba(245, 101, 101, 0.2)' }}>PUTS</th>
               </tr>
               <tr>
                 <th onClick={() => handleSort('oi', 'call')}>OI</th>
-                <th onClick={() => handleSort('volume', 'call')}>Volume</th>
                 <th onClick={() => handleSort('last_price', 'call')}>LTP</th>
                 <th onClick={() => handleSort('net_change', 'call')}>Change</th>
                 <th>Bid</th>
                 <th>Ask</th>
-                
+                <th>Buy</th>
+                <th>Buy</th>
                 <th>Bid</th>
                 <th>Ask</th>
                 <th onClick={() => handleSort('net_change', 'put')}>Change</th>
                 <th onClick={() => handleSort('last_price', 'put')}>LTP</th>
-                <th onClick={() => handleSort('volume', 'put')}>Volume</th>
                 <th onClick={() => handleSort('oi', 'put')}>OI</th>
               </tr>
             </thead>
@@ -472,7 +540,6 @@ export default function OptionChainAnalysis() {
               {getSortedData().map(({ strike, call, put, isATM }) => (
                 <tr key={strike}>
                   <td className={getMoneyness(strike, 'CE')}>{formatNumber(call?.oi)}</td>
-                  <td className={getMoneyness(strike, 'CE')}>{formatNumber(call?.volume)}</td>
                   <td className={getMoneyness(strike, 'CE')}>{call?.last_price?.toFixed(2)}</td>
                   <td className={`${getMoneyness(strike, 'CE')} ${call?.net_change >= 0 ? 'positive' : 'negative'}`}>
                     {call?.net_change?.toFixed(2)}
@@ -483,7 +550,25 @@ export default function OptionChainAnalysis() {
                   <td className={`${getMoneyness(strike, 'CE')} ask`}>
                     {call?.depth?.sell?.[0]?.price?.toFixed(2)}
                   </td>
+                  <td className={getMoneyness(strike, 'CE')}>
+                    <button
+                      className="buy-btn"
+                      onClick={() => handleBuyAtMarket(call?.symbol, call?.last_price, 'CE')}
+                      disabled={!call?.last_price}
+                    >
+                      Buy
+                    </button>
+                  </td>
                   <td className={`strike-cell ${isATM ? 'atm' : ''}`}>{strike}</td>
+                  <td className={getMoneyness(strike, 'PE')}>
+                    <button
+                      className="buy-btn"
+                      onClick={() => handleBuyAtMarket(put?.symbol, put?.last_price, 'PE')}
+                      disabled={!put?.last_price}
+                    >
+                      Buy
+                    </button>
+                  </td>
                   <td className={`${getMoneyness(strike, 'PE')} bid`}>
                     {put?.depth?.buy?.[0]?.price?.toFixed(2)}
                   </td>
@@ -494,7 +579,6 @@ export default function OptionChainAnalysis() {
                     {put?.net_change?.toFixed(2)}
                   </td>
                   <td className={getMoneyness(strike, 'PE')}>{put?.last_price?.toFixed(2)}</td>
-                  <td className={getMoneyness(strike, 'PE')}>{formatNumber(put?.volume)}</td>
                   <td className={getMoneyness(strike, 'PE')}>{formatNumber(put?.oi)}</td>
                 </tr>
               ))}
@@ -511,15 +595,15 @@ export default function OptionChainAnalysis() {
             const putWidth = maxOI > 0 ? ((put?.oi || 0) / maxOI) * 100 : 0;
             return (
               <div key={strike} className="oi-bar">
-                <div style={{fontWeight: 600, marginBottom: 5}}>{strike}</div>
-                <div style={{fontSize: '0.75rem', color: '#48bb78'}}>
+                <div style={{ fontWeight: 600, marginBottom: 5 }}>{strike}</div>
+                <div style={{ fontSize: '0.75rem', color: '#48bb78' }}>
                   CE: {formatNumber(call?.oi)}
                 </div>
-                <div className="oi-bar-fill call" style={{width: `${callWidth}%`}}></div>
-                <div style={{fontSize: '0.75rem', color: '#f56565', marginTop: 10}}>
+                <div className="oi-bar-fill call" style={{ width: `${callWidth}%` }}></div>
+                <div style={{ fontSize: '0.75rem', color: '#f56565', marginTop: 10 }}>
                   PE: {formatNumber(put?.oi)}
                 </div>
-                <div className="oi-bar-fill put" style={{width: `${putWidth}%`}}></div>
+                <div className="oi-bar-fill put" style={{ width: `${putWidth}%` }}></div>
               </div>
             );
           })}
