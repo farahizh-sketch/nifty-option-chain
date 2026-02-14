@@ -563,16 +563,16 @@ export default function OptionChainAnalysis() {
               </tr>
               <tr>
                 <th onClick={() => handleSort('oi', 'call')}>OI</th>
-                <th onClick={() => handleSort('last_price', 'call')}>LTP</th>
                 <th onClick={() => handleSort('net_change', 'call')}>Change</th>
                 <th>Bid</th>
                 <th>Ask</th>
+                <th onClick={() => handleSort('last_price', 'call')}>LTP</th>
                 <th>Buy</th>
                 <th>Buy</th>
+                <th onClick={() => handleSort('last_price', 'put')}>LTP</th>
                 <th>Bid</th>
                 <th>Ask</th>
                 <th onClick={() => handleSort('net_change', 'put')}>Change</th>
-                <th onClick={() => handleSort('last_price', 'put')}>LTP</th>
                 <th onClick={() => handleSort('oi', 'put')}>OI</th>
               </tr>
             </thead>
@@ -580,7 +580,6 @@ export default function OptionChainAnalysis() {
               {getSortedData().map(({ strike, call, put, isATM }) => (
                 <tr key={strike}>
                   <td className={getMoneyness(strike, 'CE')}>{formatNumber(call?.oi)}</td>
-                  <td className={getMoneyness(strike, 'CE')}>{call?.last_price?.toFixed(2)}</td>
                   <td className={`${getMoneyness(strike, 'CE')} ${call?.net_change >= 0 ? 'positive' : 'negative'}`}>
                     {call?.net_change?.toFixed(2)}
                   </td>
@@ -590,6 +589,7 @@ export default function OptionChainAnalysis() {
                   <td className={`${getMoneyness(strike, 'CE')} ask`}>
                     {call?.depth?.sell?.[0]?.price?.toFixed(2)}
                   </td>
+                  <td className={getMoneyness(strike, 'CE')}>{call?.last_price?.toFixed(2)}</td>
                   <td className={getMoneyness(strike, 'CE')}>
                     <button
                       className="buy-btn"
@@ -609,6 +609,7 @@ export default function OptionChainAnalysis() {
                       Buy
                     </button>
                   </td>
+                  <td className={getMoneyness(strike, 'PE')}>{put?.last_price?.toFixed(2)}</td>
                   <td className={`${getMoneyness(strike, 'PE')} bid`}>
                     {put?.depth?.buy?.[0]?.price?.toFixed(2)}
                   </td>
@@ -618,7 +619,6 @@ export default function OptionChainAnalysis() {
                   <td className={`${getMoneyness(strike, 'PE')} ${put?.net_change >= 0 ? 'positive' : 'negative'}`}>
                     {put?.net_change?.toFixed(2)}
                   </td>
-                  <td className={getMoneyness(strike, 'PE')}>{put?.last_price?.toFixed(2)}</td>
                   <td className={getMoneyness(strike, 'PE')}>{formatNumber(put?.oi)}</td>
                 </tr>
               ))}
