@@ -5,21 +5,17 @@ export async function GET() {
     const token = process.env.UPSTOX_TOKEN;
 
     if (!token) {
-      return NextResponse.json(
-        { error: "UPSTOX_TOKEN missing" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "UPSTOX_TOKEN missing" });
     }
 
-    // ✅ Target Expiries
-    const targetExpiries = ["2026-02-17", "2026-02-24"];
+    const expiryDate = "2026-02-24"; // Change expiry when needed
 
     const headers = {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
     };
 
-    // 1️⃣ Fetch Spot
+    // 1️⃣ Fetch NIFTY Spot
     const spotResponse = await fetch(
       "https://api.upstox.com/v2/market-quote/quotes?instrument_key=NSE_INDEX|Nifty 50",
       { headers }
@@ -28,24 +24,22 @@ export async function GET() {
     const spotJson = await spotResponse.json();
 
     const spotPrice =
-      spotJson.data?.["NSE_INDEX:Nifty 50"]?.last_price ?? 0;
+      spotJson.data?.["NSE_INDEX:Nifty 50"]?.last_price || 0;
 
     if (!spotPrice) {
-      return NextResponse.json(
-        { error: "Unable to fetch spot price" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Unable to fetch spot price" });
     }
 
+    // 2️⃣ Calculate ATM
     const atm = Math.round(spotPrice / 50) * 50;
 
-    // 2️⃣ Required Strikes
-    const requiredStrikes: number[] = [];
+    // 3️⃣ Create required strikes (5 up & 5 down)
+    const requiredStrikes = [];
     for (let i = -9; i <= 9; i++) {
       requiredStrikes.push(atm + i * 50);
     }
 
-    // 3️⃣ Fetch Contracts
+    // 4️⃣ Fetch all contracts
     const contractResponse = await fetch(
       "https://api.upstox.com/v2/option/contract?instrument_key=NSE_INDEX|Nifty 50",
       { headers }
@@ -54,44 +48,26 @@ export async function GET() {
     const contractData = await contractResponse.json();
 
     if (!contractData.data) {
-      return NextResponse.json(
-        { error: "No contract data received" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "No contract data received" });
     }
 
-    // 🟢 DEBUG: See all available expiries from Upstox
-    const availableExpiries = [
-      ...new Set(contractData.data.map((c: any) => c.expiry)),
-    ];
-
-    console.log("Available Expiries from Upstox:", availableExpiries);
-
-    // 4️⃣ Filter by expiry + strike
-    const selectedContracts = contractData.data.filter((c: any) => {
-      const contractExpiry = String(c.expiry).trim();
-
-      return (
-        targetExpiries.includes(contractExpiry) &&
+    // 5️⃣ Filter by expiry AND required strikes
+    const selectedContracts = contractData.data.filter(
+      (c) =>
+        c.expiry === expiryDate &&
         requiredStrikes.includes(Number(c.strike_price))
-      );
-    });
+    );
 
     if (selectedContracts.length === 0) {
-      return NextResponse.json(
-        {
-          error: "No matching contracts found",
-          availableExpiries,
-        },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "No matching contracts found" });
     }
 
-    // 5️⃣ Fetch Quotes
+    // 6️⃣ Create instrument keys
     const instrumentKeys = selectedContracts
-      .map((c: any) => c.instrument_key)
+      .map((c) => c.instrument_key)
       .join(",");
 
+    // 7️⃣ Fetch option quotes
     const quoteResponse = await fetch(
       `https://api.upstox.com/v2/market-quote/quotes?instrument_key=${instrumentKeys}`,
       { headers }
@@ -99,23 +75,19 @@ export async function GET() {
 
     const quoteData = await quoteResponse.json();
 
+    // 8️⃣ Return final response
     return NextResponse.json({
       status: "success",
       spot: spotPrice,
-      atm,
-      requestedExpiries: targetExpiries,
-      availableExpiries,
+      atm: atm,
       strikes: requiredStrikes,
       data: quoteData.data,
     });
 
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        status: "error",
-        message: error?.message || "Unexpected error",
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return NextResponse.json({
+      status: "error",
+      message: error.message,
+    });
   }
 }
