@@ -11,23 +11,19 @@ export async function GET() {
       );
     }
 
-    // ✅ Multiple expiry dates
-    const expiryDates = ["2026-02-17", "2026-02-24"];
+    // ✅ Target Expiries
+    const targetExpiries = ["2026-02-17", "2026-02-24"];
 
     const headers = {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
     };
 
-    // 1️⃣ Fetch NIFTY Spot
+    // 1️⃣ Fetch Spot
     const spotResponse = await fetch(
       "https://api.upstox.com/v2/market-quote/quotes?instrument_key=NSE_INDEX|Nifty 50",
       { headers }
     );
-
-    if (!spotResponse.ok) {
-      throw new Error("Failed to fetch spot price");
-    }
 
     const spotJson = await spotResponse.json();
 
@@ -41,24 +37,19 @@ export async function GET() {
       );
     }
 
-    // 2️⃣ Calculate ATM
     const atm = Math.round(spotPrice / 50) * 50;
 
-    // 3️⃣ Create required strikes (-9 to +9)
+    // 2️⃣ Required Strikes
     const requiredStrikes: number[] = [];
     for (let i = -9; i <= 9; i++) {
       requiredStrikes.push(atm + i * 50);
     }
 
-    // 4️⃣ Fetch all contracts
+    // 3️⃣ Fetch Contracts
     const contractResponse = await fetch(
       "https://api.upstox.com/v2/option/contract?instrument_key=NSE_INDEX|Nifty 50",
       { headers }
     );
-
-    if (!contractResponse.ok) {
-      throw new Error("Failed to fetch contracts");
-    }
 
     const contractData = await contractResponse.json();
 
@@ -69,43 +60,51 @@ export async function GET() {
       );
     }
 
-    // 5️⃣ Filter by MULTIPLE expiry dates AND required strikes
-    const selectedContracts = contractData.data.filter(
-      (c: any) =>
-        expiryDates.includes(c.expiry) &&
+    // 🟢 DEBUG: See all available expiries from Upstox
+    const availableExpiries = [
+      ...new Set(contractData.data.map((c: any) => c.expiry)),
+    ];
+
+    console.log("Available Expiries from Upstox:", availableExpiries);
+
+    // 4️⃣ Filter by expiry + strike
+    const selectedContracts = contractData.data.filter((c: any) => {
+      const contractExpiry = String(c.expiry).trim();
+
+      return (
+        targetExpiries.includes(contractExpiry) &&
         requiredStrikes.includes(Number(c.strike_price))
-    );
+      );
+    });
 
     if (selectedContracts.length === 0) {
       return NextResponse.json(
-        { error: "No matching contracts found" },
+        {
+          error: "No matching contracts found",
+          availableExpiries,
+        },
         { status: 404 }
       );
     }
 
-    // 6️⃣ Create instrument keys
+    // 5️⃣ Fetch Quotes
     const instrumentKeys = selectedContracts
       .map((c: any) => c.instrument_key)
       .join(",");
 
-    // 7️⃣ Fetch option quotes
     const quoteResponse = await fetch(
       `https://api.upstox.com/v2/market-quote/quotes?instrument_key=${instrumentKeys}`,
       { headers }
     );
 
-    if (!quoteResponse.ok) {
-      throw new Error("Failed to fetch option quotes");
-    }
-
     const quoteData = await quoteResponse.json();
 
-    // 8️⃣ Return final response
     return NextResponse.json({
       status: "success",
       spot: spotPrice,
       atm,
-      expiryDates,
+      requestedExpiries: targetExpiries,
+      availableExpiries,
       strikes: requiredStrikes,
       data: quoteData.data,
     });
