@@ -8,7 +8,7 @@ export async function GET() {
       return NextResponse.json({ error: "UPSTOX_TOKEN missing" }, { status: 500 });
     }
 
-    const expiryDates = ["2026-02-17", "2026-02-24"]; // Add/remove expiry dates here
+    const expiryDates = "2026-02-17"; // Add/remove expiry dates here
 
     const headers = {
       Authorization: `Bearer ${token}`,
