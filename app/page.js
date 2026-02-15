@@ -476,35 +476,39 @@ export default function OptionChainAnalysis() {
           color: #ecc94b;
         }
 
-        .user-info-bar {
+        .compact-info-bar {
           display: flex;
           justify-content: space-between;
           align-items: center;
           background: rgba(255, 255, 255, 0.05);
           backdrop-filter: blur(10px);
-          padding: 10px 20px;
-          border-radius: 12px;
+          padding: 8px 15px;
+          border-radius: 10px;
           border: 1px solid rgba(255, 255, 255, 0.1);
-          margin-bottom: 20px;
-          font-size: 0.8rem;
+          margin-bottom: 15px;
+          font-size: 0.75rem;
           color: #a0aec0;
           flex-wrap: wrap;
           gap: 10px;
         }
 
-        .user-info-item {
+        .info-item {
           display: flex;
-          gap: 8px;
+          gap: 6px;
           align-items: center;
         }
 
-        .user-info-value {
+        .info-value {
           color: #fff;
           font-weight: 600;
         }
 
-        .user-info-value.profit { color: #48bb78; }
-        .user-info-value.loss { color: #f56565; }
+        .info-value.profit { color: #48bb78; }
+        .info-value.loss { color: #f56565; }
+        .info-value.bullish { color: #48bb78; }
+        .info-value.bearish { color: #f56565; }
+        .info-value.neutral { color: #ecc94b; }
+        .info-value.atm { color: #ed8936; }
 
         .analysis-section {
           background: rgba(255, 255, 255, 0.05);
@@ -761,7 +765,7 @@ export default function OptionChainAnalysis() {
             font-size: 1.5rem;
           }
 
-          .user-info-bar {
+          .compact-info-bar {
             flex-direction: column;
             align-items: flex-start;
           }
@@ -932,20 +936,42 @@ export default function OptionChainAnalysis() {
 
         {/* User Info Bar */}
         {!showUserSetup && (
-          <div className="user-info-bar">
-            <div className="user-info-item">
+          <div className="compact-info-bar">
+            <div className="info-item">
               <span>User ID:</span>
-              <span className="user-info-value">{userId}</span>
+              <span className="info-value">{userId}</span>
             </div>
-            <div className="user-info-item">
+            <div className="info-item">
               <span>Wallet:</span>
-              <span className="user-info-value">₹{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="info-value">₹{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <div className="user-info-item">
+            <div className="info-item">
               <span>Net Profit:</span>
-              <span className={`user-info-value ${calculateTotalPnL() >= 0 ? 'profit' : 'loss'}`}>
+              <span className={`info-value ${calculateTotalPnL() >= 0 ? 'profit' : 'loss'}`}>
                 ₹{calculateTotalPnL().toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Market Info Bar */}
+        {!showUserSetup && (
+          <div className="compact-info-bar" style={{ background: 'rgba(66, 153, 225, 0.08)' }}>
+            <div className="info-item">
+              <span>ATM Strike:</span>
+              <span className="info-value atm">{formatNumber(data?.atm)}</span>
+            </div>
+            <div className="info-item">
+              <span>PCR (OI):</span>
+              <span className={`info-value ${sentiment.toLowerCase()}`}>{pcr.oiPCR}</span>
+            </div>
+            <div className="info-item">
+              <span>PCR (Vol):</span>
+              <span className={`info-value ${sentiment.toLowerCase()}`}>{pcr.volumePCR}</span>
+            </div>
+            <div className="info-item">
+              <span>Sentiment:</span>
+              <span className={`info-value ${sentiment.toLowerCase()}`}>{sentiment}</span>
             </div>
           </div>
         )}
@@ -954,26 +980,6 @@ export default function OptionChainAnalysis() {
           <div className="metric-card">
             <div className="metric-label">Nifty Spot</div>
             <div className="metric-value spot">₹{formatNumber(data?.spot)}</div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-label">ATM Strike</div>
-            <div className="metric-value atm">{formatNumber(data?.atm)}</div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-label">PCR (OI)</div>
-            <div className={`metric-value ${sentiment.toLowerCase()}`}>{pcr.oiPCR}</div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-label">PCR (Volume)</div>
-            <div className={`metric-value ${sentiment.toLowerCase()}`}>{pcr.volumePCR}</div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-label">Market Sentiment</div>
-            <div className={`metric-value ${sentiment.toLowerCase()}`}>{sentiment}</div>
           </div>
 
           <div className="metric-card">
