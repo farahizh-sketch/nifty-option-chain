@@ -5,41 +5,45 @@ export async function GET() {
     const token = process.env.UPSTOX_TOKEN;
 
     if (!token) {
-      return NextResponse.json({ error: "UPSTOX_TOKEN missing" });
+      return NextResponse.json(
+        { error: "UPSTOX_TOKEN missing" },
+        { status: 500 }
+      );
     }
 
-    const expiryDate = "2026-02-24"; // Change expiry when needed
+    const expiryDates = ["2026-02-17", "2026-02-24"];
 
     const headers = {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
     };
 
-    // 1️⃣ Fetch NIFTY Spot
+    // 1️⃣ Fetch Spot
     const spotResponse = await fetch(
       "https://api.upstox.com/v2/market-quote/quotes?instrument_key=NSE_INDEX|Nifty 50",
       { headers }
     );
 
     const spotJson = await spotResponse.json();
-
     const spotPrice =
-      spotJson.data?.["NSE_INDEX:Nifty 50"]?.last_price || 0;
+      spotJson.data?.["NSE_INDEX:Nifty 50"]?.last_price ?? 0;
 
     if (!spotPrice) {
-      return NextResponse.json({ error: "Unable to fetch spot price" });
+      return NextResponse.json(
+        { error: "Unable to fetch spot price" },
+        { status: 500 }
+      );
     }
 
-    // 2️⃣ Calculate ATM
     const atm = Math.round(spotPrice / 50) * 50;
 
-    // 3️⃣ Create required strikes (5 up & 5 down)
-    const requiredStrikes = [];
+    // 2️⃣ Required Strikes
+    const requiredStrikes: number[] = [];
     for (let i = -9; i <= 9; i++) {
       requiredStrikes.push(atm + i * 50);
     }
 
-    // 4️⃣ Fetch all contracts
+    // 3️⃣ Fetch Contracts
     const contractResponse = await fetch(
       "https://api.upstox.com/v2/option/contract?instrument_key=NSE_INDEX|Nifty 50",
       { headers }
@@ -48,46 +52,57 @@ export async function GET() {
     const contractData = await contractResponse.json();
 
     if (!contractData.data) {
-      return NextResponse.json({ error: "No contract data received" });
+      return NextResponse.json(
+        { error: "No contract data received" },
+        { status: 500 }
+      );
     }
 
-    // 5️⃣ Filter by expiry AND required strikes
-    const selectedContracts = contractData.data.filter(
-      (c) =>
-        c.expiry === expiryDate &&
-        requiredStrikes.includes(Number(c.strike_price))
-    );
+    let finalQuoteData: any = {};
 
-    if (selectedContracts.length === 0) {
-      return NextResponse.json({ error: "No matching contracts found" });
+    // 🔥 4️⃣ Process each expiry separately
+    for (const expiry of expiryDates) {
+      const contractsForExpiry = contractData.data.filter(
+        (c: any) =>
+          c.expiry === expiry &&
+          requiredStrikes.includes(Number(c.strike_price))
+      );
+
+      if (contractsForExpiry.length === 0) continue;
+
+      const instrumentKeys = contractsForExpiry
+        .map((c: any) => c.instrument_key)
+        .join(",");
+
+      const quoteResponse = await fetch(
+        `https://api.upstox.com/v2/market-quote/quotes?instrument_key=${instrumentKeys}`,
+        { headers }
+      );
+
+      const quoteData = await quoteResponse.json();
+
+      finalQuoteData = {
+        ...finalQuoteData,
+        ...quoteData.data,
+      };
     }
 
-    // 6️⃣ Create instrument keys
-    const instrumentKeys = selectedContracts
-      .map((c) => c.instrument_key)
-      .join(",");
-
-    // 7️⃣ Fetch option quotes
-    const quoteResponse = await fetch(
-      `https://api.upstox.com/v2/market-quote/quotes?instrument_key=${instrumentKeys}`,
-      { headers }
-    );
-
-    const quoteData = await quoteResponse.json();
-
-    // 8️⃣ Return final response
     return NextResponse.json({
       status: "success",
       spot: spotPrice,
-      atm: atm,
+      atm,
+      expiryDates,
       strikes: requiredStrikes,
-      data: quoteData.data,
+      data: finalQuoteData,
     });
 
-  } catch (error) {
-    return NextResponse.json({
-      status: "error",
-      message: error.message,
-    });
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        status: "error",
+        message: error?.message || "Unexpected error",
+      },
+      { status: 500 }
+    );
   }
 }
