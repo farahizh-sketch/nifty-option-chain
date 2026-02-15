@@ -952,7 +952,7 @@ export default function OptionChainAnalysis() {
 
         <div className="metrics-grid">
           <div className="metric-card">
-            <div className="metric-label">Spot Price</div>
+            <div className="metric-label">Nifty Spot</div>
             <div className="metric-value spot">₹{formatNumber(data?.spot)}</div>
           </div>
 
